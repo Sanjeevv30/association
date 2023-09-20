@@ -1,0 +1,101 @@
+const Product = require('../models/product');
+
+exports.getAddProduct = (req, res, next) => {
+  res.render('admin/edit-product', {
+    pageTitle: 'Add Product',
+    path: '/admin/add-product',
+    editing: false
+  });
+};
+
+exports.postAddProduct = async (req, res, next) => {
+  const { title, imageUrl, price, description } = req.body;
+
+  try {
+    await req.user.createProduct({
+      title,
+      price,
+      imageUrl,
+      description,
+    });
+
+    console.log('Created Product');
+    res.redirect('/admin/products');
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+exports.getEditProduct = async (req, res, next) => {
+  const editMode = req.query.edit;
+  if (!editMode) {
+    return res.redirect('/');
+  }
+
+  const prodId = req.params.productId;
+
+  req.user.getProducts({where:{id:prodId}})
+
+  try {
+    const product = await Product.findByPk(prodId);
+
+    if (!product) {
+      return res.redirect('/');
+    }
+
+    res.render('admin/edit-product', {
+      pageTitle: 'Edit Product',
+      path: '/admin/edit-product',
+      editing: editMode,
+      product,
+    });
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+exports.postEditProduct = async (req, res, next) => {
+  const { productId, title, price, imageUrl, description } = req.body;
+
+  const updatedProduct = new Product(
+    productId,
+    title,
+    imageUrl,
+    description,
+    price
+  );
+
+  try {
+    await updatedProduct.save();
+    res.redirect('/admin/products');
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+exports.getProducts = async (req, res, next) => {
+
+  req.user.getProducts()
+  try {
+    const products = await Product.findAll();
+
+    res.render('admin/products', {
+      prods: products,
+      pageTitle: 'Admin Products',
+      path: '/admin/products',
+    });
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+exports.postDeleteProduct = async (req, res, next) => {
+  const prodId = req.body.productId;
+
+  try {
+    await Product.deleteById(prodId);
+    res.redirect('/admin/products');
+  } catch (err) {
+    console.error(err);
+  }
+};
