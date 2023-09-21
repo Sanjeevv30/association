@@ -52,41 +52,88 @@ exports.getIndex = (req, res, next) => {
 };
 
 exports.getCart = (req, res, next) => {
-  Cart.getCart(cart => {
-    Product.fetchAll(products => {
-      const cartProducts = [];
-      for (product of products) {
-        const cartProductData = cart.products.find(
-          prod => prod.id === product.id
-        );
-        if (cartProductData) {
-          cartProducts.push({ productData: product, qty: cartProductData.qty });
-        }
-      }
+
+  req.user
+  .getCart()
+  .then(cart =>{
+    return cart
+    .getProducts()
+    .then(products =>{
       res.render('shop/cart', {
-        path: '/cart',
-        pageTitle: 'Your Cart',
-        products: cartProducts
+              path: '/cart',
+              pageTitle: 'Your Cart',
+              products: products
+            });
+    })
+    .catch(err => console.log(err))
+  })
+  .catch(err =>console.log(err))
+};
+
+exports.postCart = async (req, res, next) => {
+  const prodId = req.body.productId;
+
+  try {
+    // Get the user's cart
+    const cart = await req.user.getCart();
+
+    // Check if the product already exists in the cart
+    const products = await cart.getProducts({ where: { id: prodId } });
+
+    let product;
+    if (products.length > 0) {
+      product = products[0];
+    }
+
+    let newQuantity = 1;
+
+    if (product) {
+      // Handle existing product logic
+      // ...
+    }
+
+    // Fetch the product to add to the cart
+    const productToAdd = await Product.findByPk(prodId);
+
+    // Add the product to the cart
+    if (!cart) {
+      // If the cart doesn't exist, create it
+      const newCart = await req.user.createCart();
+      await newCart.addProduct(productToAdd, {
+        through: { quantity: newQuantity },
       });
-    });
-  });
-};
+    } else {
+      // If the cart exists, use it
+      await cart.addProduct(product, {
+        through: { quantity: newQuantity },
+      });
+    }
 
-exports.postCart = (req, res, next) => {
-  const prodId = req.body.productId;
-  Product.findById(prodId, product => {
-    Cart.addProduct(prodId, product.price);
-  });
-  res.redirect('/cart');
-};
-
-exports.postCartDeleteProduct = (req, res, next) => {
-  const prodId = req.body.productId;
-  Product.findById(prodId, product => {
-    Cart.deleteProduct(prodId, product.price);
     res.redirect('/cart');
-  });
+  } catch (err) {
+    console.log(err);
+    // Handle errors here
+  }
 };
+
+
+exports.postCartDeleteProduct = async (req, res, next) => {
+  const prodId = req.body.productId;
+
+  try {
+    const product = await Product.findByPk(prodId);
+    // Use req.user to get the cart and delete the product
+    await req.user.getCart().then(cart => {
+      return cart.removeProduct(product);
+    });
+
+    res.redirect('/cart');
+  } catch (err) {
+    console.log(err);
+    // Handle errors here
+  }
+};
+
 
 exports.getOrders = (req, res, next) => {
   res.render('shop/orders', {
